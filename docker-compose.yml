@@ -1,0 +1,59 @@
+services:
+  mongodb:
+    image: mongo:8.2.1
+    restart: always
+    ports:
+      - 27017:27017
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+    networks:
+      - parse-network
+
+  parse:
+    image:
+      parseplatform/parse-server:8.2.5
+
+      # Pinned version
+    ports:
+      - 1337:1337
+    volumes:
+      - config-vol:/parse-server/config
+    depends_on:
+      - mongodb
+    environment:
+      - PORT=1337
+      - PARSE_SERVER_APPLICATION_ID=${PARSE_SERVER_APPLICATION_ID}
+      - PARSE_SERVER_MASTER_KEY=${PARSE_SERVER_MASTER_KEY}
+      - PARSE_SERVER_DATABASE_URI=${PARSE_SERVER_DATABASE_URI}
+      - PARSE_SERVER_URL=${PARSE_SERVER_URL}
+      - PARSE_SERVER_CLOUD=${PARSE_SERVER_CLOUD}
+    networks:
+      - parse-network
+
+  dashboard:
+    image: parseplatform/parse-dashboard:7.5.0 # Pinned version
+    ports:
+      - 4040:4040
+    environment:
+      - PARSE_DASHBOARD_SERVER_URL=${PARSE_DASHBOARD_SERVER_URL}
+      - PARSE_DASHBOARD_APP_ID=${PARSE_DASHBOARD_APP_ID}
+      - PARSE_DASHBOARD_MASTER_KEY=${PARSE_DASHBOARD_MASTER_KEY}
+      - PARSE_DASHBOARD_APP_NAME=${PARSE_DASHBOARD_APP_NAME}
+      - PARSE_DASHBOARD_ALLOW_INSECURE_HTTP=0 # Disable insecure HTTP; use HTTPS
+      - PARSE_DASHBOARD_USER_ID=${PARSE_DASHBOARD_USER_ID}
+      - PARSE_DASHBOARD_USER_PASSWORD=${PARSE_DASHBOARD_USER_PASSWORD}
+    networks:
+      - parse-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  config-vol:
+    driver: local
+
+networks:
+  parse-network:
+    driver: bridge
