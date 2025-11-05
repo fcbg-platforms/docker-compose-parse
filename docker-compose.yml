@@ -1,6 +1,7 @@
 services:
   mongodb:
     image: mongo:7.0.3
+    container_name: mongodb
     restart: always
     ports:
       - 27017:27017
@@ -12,7 +13,8 @@ services:
     networks:
       - parse-network
 
-  parse:
+  parse-server:
+    container_name: parse-server
     image: parseplatform/parse-server:6.5.11
     restart: always
     ports:
@@ -32,7 +34,8 @@ services:
     networks:
       - parse-network
 
-  dashboard:
+  parse-dashboard:
+    container_name: parse-dashboard
     image: parseplatform/parse-dashboard:7.5.0
     restart: always
     ports:
@@ -45,6 +48,22 @@ services:
       - PARSE_DASHBOARD_ALLOW_INSECURE_HTTP=${PARSE_DASHBOARD_ALLOW_INSECURE_HTTP}
       - PARSE_DASHBOARD_USER_ID=${PARSE_DASHBOARD_USER_ID}
       - PARSE_DASHBOARD_USER_PASSWORD=${PARSE_DASHBOARD_USER_PASSWORD}
+    networks:
+      - parse-network
+
+  # Optional: Mongo Restore
+  mongo-restore:
+    container_name: mongo-restore
+    image: mongo:7.0.3
+    restart: on-failure
+    depends_on:
+      - mongodb
+    volumes:
+      - ./mongo-backup:/mongo-backup:ro
+    entrypoint: >
+      bash -c "sleep 20 &&
+      mongorestore --host mongodb --port 27017 --username ${MONGO_INITDB_ROOT_USERNAME} --password ${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin --db test --drop /mongo-backup/test
+      "
     networks:
       - parse-network
 
