@@ -1,6 +1,6 @@
 services:
   mongodb:
-    image: mongo:7.0.3
+    image: mongo:8.2.1
     container_name: mongodb
     restart: always
     ports:
@@ -15,7 +15,7 @@ services:
 
   parse-server:
     container_name: parse-server
-    image: parseplatform/parse-server:6.5.11
+    image: parseplatform/parse-server:8.3.0
     restart: always
     ports:
       - 1337:1337
@@ -36,7 +36,7 @@ services:
 
   parse-dashboard:
     container_name: parse-dashboard
-    image: parseplatform/parse-dashboard:7.5.0
+    image: parseplatform/parse-dashboard:8.0.0
     restart: always
     ports:
       - 4040:4040
