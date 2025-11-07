@@ -10,7 +10,7 @@ if [ -z "$MONGODB_DNS" ]; then
     echo "Getting MongoDB DNS..."
     MONGODB_DNS=$(az container show \
       --name mongodb \
-      --resource-group TikTik_Multi_2_RG \
+      --resource-group TikTik_Multi_3_RG \
       --query ipAddress.fqdn \
       --output tsv)
     
@@ -39,7 +39,7 @@ sed "s|__RANDOM__|${RANDOM}|g" > "$TEMP_FILE"
 
 # Deploy the container
 echo "Deploying Parse Server container..."
-az container create --resource-group TikTik_Multi_2_RG --file "$TEMP_FILE"
+az container create --resource-group TikTik_Multi_3_RG --file "$TEMP_FILE"
 
 # Capture the result
 RESULT=$?
@@ -53,7 +53,7 @@ if [ $RESULT -eq 0 ]; then
     # Get Parse Server DNS name
     PARSE_SERVER_DNS=$(az container show \
       --name parse-server \
-      --resource-group TikTik_Multi_2_RG \
+      --resource-group TikTik_Multi_3_RG \
       --query ipAddress.fqdn \
       --output tsv)
     

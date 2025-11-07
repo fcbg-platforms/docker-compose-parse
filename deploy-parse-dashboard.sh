@@ -10,7 +10,7 @@ if [ -z "$PARSE_SERVER_DNS" ]; then
     echo "Getting Parse Server DNS..."
     PARSE_SERVER_DNS=$(az container show \
       --name parse-server \
-      --resource-group TikTik_Multi_2_RG \
+      --resource-group TikTik_Multi_3_RG \
       --query ipAddress.fqdn \
       --output tsv)
     
@@ -40,7 +40,7 @@ sed "s|__RANDOM__|${RANDOM}|g" > "$TEMP_FILE"
 
 # Deploy the container
 echo "Deploying Parse Dashboard container..."
-az container create --resource-group TikTik_Multi_2_RG --file "$TEMP_FILE"
+az container create --resource-group TikTik_Multi_3_RG --file "$TEMP_FILE"
 
 # Capture the result
 RESULT=$?
@@ -54,7 +54,7 @@ if [ $RESULT -eq 0 ]; then
     # Get Parse Dashboard DNS name
     PARSE_DASHBOARD_DNS=$(az container show \
       --name parse-dashboard \
-      --resource-group TikTik_Multi_2_RG \
+      --resource-group TikTik_Multi_3_RG \
       --query ipAddress.fqdn \
       --output tsv)
     

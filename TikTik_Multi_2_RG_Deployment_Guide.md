@@ -1,256 +1,112 @@
-# TikTik_Multi_2_RG: Parse Server Deployment Guide (Azure ACI)
+# TikTik_Multi_3_RG: Parse Server Deployment Guide (Azure ACI)
 
-This guide provides step-by-step instructions for deploying a **Parse Server**, **Parse Dashboard**, and **MongoDB** stack to **Azure Container Instances (ACI)** in the **Switzerland North** region.
-The deployment includes **data restoration** from a MongoDB backup and uses a `.env` file for environment variables.
-
----
-
-## **Prerequisites**
-
-1. **Azure CLI** installed and logged in:
-
-   ```bash
-   az login
-   ```
-
-2. **`.env` file** with all required environment variables (e.g., `MONGO_INITDB_ROOT_USERNAME`, `PARSE_SERVER_APPLICATION_ID`).
-3. **MongoDB backup** available (e.g., in a `.tar.gz` or `.dump` format).
+This guide explains how to deploy MongoDB, Parse Server, and Parse Dashboard to **Azure Container Instances (ACI)** in **Switzerland North** using the helper scripts bundled with this project.
 
 ---
 
-## **Step 1: Create Resource Group**
+## Prerequisites
 
-Create a resource group in **Switzerland North**:
+- Azure CLI installed and logged in: `az login`
+- `.env` file beside the scripts (use `.env.example` as a template)
+- MongoDB backup reachable from Azure (optional if you plan to restore data)
+- Bash shell (Git Bash, WSL, or Azure Cloud Shell)
+
+Make the scripts executable once:
 
 ```bash
-az group create --name TikTik_Multi_2_RG -l switzerlandnorth
+chmod +x deploy-*.sh
 ```
 
 ---
 
-## **Step 2: Load Environment Variables**
+## Quick Deploy (recommended)
 
-Load variables from your `.env` file into your shell:
+Run the master script; it orchestrates storage provisioning, MongoDB, Parse Server, and the dashboard:
 
 ```bash
-set -a && source .env && set +a
+./deploy-all.sh
 ```
 
-Verify variables are loaded:
+The script will:
+
+1. Load variables from `.env`
+2. Ensure the storage account and file share exist
+3. Deploy MongoDB and wait for a public FQDN
+4. Deploy Parse Server (using the discovered MongoDB DNS)
+5. Deploy Parse Dashboard (using the discovered Parse Server DNS)
+6. Print the public endpoints at the end
+
+Keep the terminal open until the script finishes.
+
+---
+
+## Deploy Components Individually (optional)
+
+Use these if you need to redeploy a single service:
 
 ```bash
-echo $MONGO_INITDB_ROOT_USERNAME
-echo $PARSE_SERVER_APPLICATION_ID
+./deploy-mongodb.sh
+./deploy-parse-server.sh
+./deploy-parse-dashboard.sh
+```
+
+Each script reuses the `.env` variables and regenerates the required YAML on the fly.
+
+---
+
+## Accessing the Services
+
+After deployment, copy the DNS names printed by the scripts:
+
+- **Parse Server:** `http://parse-server-<random>.switzerlandnorth.azurecontainer.io:1337/parse`
+- **Parse Dashboard:** `http://parse-dashboard-<random>.switzerlandnorth.azurecontainer.io:4040`
+
+Use the credentials from your `.env` file to sign in to the dashboard.
+
+### Retrieve DNS Names Later
+
+If the terminal output was closed, query Azure for the endpoints:
+
+```bash
+az container show --name mongodb --resource-group TikTik_Multi_3_RG --query ipAddress.fqdn -o tsv
+az container show --name parse-server --resource-group TikTik_Multi_3_RG --query ipAddress.fqdn -o tsv
+az container show --name parse-dashboard --resource-group TikTik_Multi_3_RG --query ipAddress.fqdn -o tsv
 ```
 
 ---
 
-## **Step 3: Create Azure File Share for MongoDB Persistence**
+## Optional: HTTPS Frontend
 
-Since ACI doesn’t support persistent volumes, use **Azure Files** to store MongoDB data.
+ACI does not provide TLS termination. To expose HTTPS you can either:
 
-### **Create Storage Account**
+- Place Azure Application Gateway / Front Door in front of the dashboard, or
+- Deploy an additional reverse-proxy container (e.g., NGINX) that serves 443 and forwards to port 4040 with your certificates mounted as secrets.
 
-```bash
-az storage account create \
-  --name tiktikstorage8040 \
-  --resource-group TikTik_Multi_2_RG \
-  --location switzerlandnorth \
-  --sku Standard_LRS
-```
+---
 
-### **Create File Share**
+## Cleanup
+
+Remove every deployed resource when finished:
 
 ```bash
-az storage share create \
-  --name mongodb-data \
-  --account-name tiktikstorage8040
-```
-
-### **Get Storage Account Key**
-
-```bash
-STORAGE_KEY=$(az storage account keys list \
-  --account-name tiktikstorage8040 \
-  --resource-group TikTik_Multi_2_RG \
-  --query "[0].value" \
-  --output tsv)
+az group delete --name TikTik_Multi_3_RG --yes --no-wait
 ```
 
 ---
 
-## **Step 4: Deploy MongoDB with Azure Files**
+## Troubleshooting
 
-Deploy MongoDB with the Azure File Share mounted for data persistence:
-
-```bash
-az container create \
-  --name mongodb \
-  --resource-group TikTik_Multi_2_RG \
-  --image mongo:8.2.1 \
-  --environment-variables \
-    "MONGO_INITDB_ROOT_USERNAME=$MONGO_INITDB_ROOT_USERNAME" \
-    "MONGO_INITDB_ROOT_PASSWORD=$MONGO_INITDB_ROOT_PASSWORD" \
-  --ports 27017 \
-  --ip-address Public \
-  --dns-name-label mongodb-$RANDOM \
-  --restart-policy Always \
-  --azure-file-volume-mount-path /data/db \
-  --azure-file-volume-account-name tiktikstorage8040 \
-  --azure-file-volume-account-key "$STORAGE_KEY" \
-  --azure-file-volume-share-name mongodb-data
-```
-
-### **Get MongoDB DNS Name**
-
-```bash
-MONGODB_DNS=$(az container show \
-  --name mongodb \
-  --resource-group TikTik_Multi_2_RG \
-  --query ipAddress.fqdn \
-  --output tsv)
-echo "MongoDB DNS: $MONGODB_DNS"
-```
-
----
-
-## **Step 5: Restore MongoDB Data**
-
-Deploy a temporary ACI container to restore your MongoDB backup.
-Upload your backup to a **publicly accessible URL** (e.g., Azure Blob Storage) or use a custom script.
-
-### **Example: Restore from a Public URL**
-
-```bash
-az container create \
-  --name mongo-restore \
-  --resource-group TikTik_Multi_2_RG \
-  --image mongo:7.0.3 \
-  --command-line "bash -c 'sleep 20 && wget -O /backup.tar.gz https://your-backup-url/backup.tar.gz && tar -xzf /backup.tar.gz && mongorestore --host $MONGODB_DNS --port 27017 --username $MONGO_INITDB_ROOT_USERNAME --password $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --db test --drop /backup'" \
-  --environment-variables \
-    MONGO_INITDB_ROOT_USERNAME=$MONGO_INITDB_ROOT_USERNAME \
-    MONGO_INITDB_ROOT_PASSWORD=$MONGO_INITDB_ROOT_PASSWORD \
-  --restart-policy OnFailure
-```
-
----
-
-## **Step 6: Deploy Parse Server**
-
-Deploy Parse Server with the MongoDB connection string:
-
-```bash
-az container create \
-  --name parse-server \
-  --resource-group TikTik_Multi_2_RG \
-  --image parseplatform/parse-server:8.3.0 \
-  --environment-variables \
-    PORT=1337 \
-    PARSE_SERVER_APPLICATION_ID=$PARSE_SERVER_APPLICATION_ID \
-    PARSE_SERVER_MASTER_KEY=$PARSE_SERVER_MASTER_KEY \
-    PARSE_SERVER_DATABASE_URI="mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@$MONGODB_DNS:27017/mycustomdb" \
-    PARSE_SERVER_URL=$PARSE_SERVER_URL \
-  --ports 1337 \
-  --ip-address Public \
-  --dns-name-label parse-server-$RANDOM \
-  --restart-policy Always
-```
-
-### **Get Parse Server DNS Name**
-
-```bash
-PARSE_SERVER_DNS=$(az container show \
-  --name parse-server \
-  --resource-group TikTik_Multi_2_RG \
-  --query ipAddress.fqdn \
-  --output tsv)
-echo "Parse Server DNS: $PARSE_SERVER_DNS"
-```
-
----
-
-## **Step 7: Deploy Parse Dashboard**
-
-Deploy Parse Dashboard with the Parse Server URL:
-
-```bash
-az container create \
-  --name parse-dashboard \
-  --resource-group TikTik_Multi_2_RG \
-  --image parseplatform/parse-dashboard:8.0.0 \
-  --environment-variables \
-    PARSE_DASHBOARD_SERVER_URL="http://$PARSE_SERVER_DNS:1337/parse" \
-    PARSE_DASHBOARD_APP_ID=$PARSE_SERVER_APPLICATION_ID \
-    PARSE_DASHBOARD_MASTER_KEY=$PARSE_SERVER_MASTER_KEY \
-    PARSE_DASHBOARD_APP_NAME="$PARSE_DASHBOARD_APP_NAME" \
-    PARSE_DASHBOARD_ALLOW_INSECURE_HTTP=$PARSE_DASHBOARD_ALLOW_INSECURE_HTTP \
-    PARSE_DASHBOARD_USER_ID=$PARSE_DASHBOARD_USER_ID \
-    PARSE_DASHBOARD_USER_PASSWORD=$PARSE_DASHBOARD_USER_PASSWORD \
-  --ports 4040 \
-  --ip-address Public \
-  --dns-name-label parse-dashboard-$RANDOM \
-  --restart-policy Always
-```
-
-### **Get Parse Dashboard DNS Name**
-
-```bash
-PARSE_DASHBOARD_DNS=$(az container show \
-  --name parse-dashboard \
-  --resource-group TikTik_Multi_2_RG \
-  --query ipAddress.fqdn \
-  --output tsv)
-echo "Parse Dashboard DNS: $PARSE_DASHBOARD_DNS"
-```
-
----
-
-## **Step 8: Verify the Deployment**
-
-1. **Access Parse Server**:
-
-   ```
-   http://$PARSE_SERVER_DNS:1337/parse
-   ```
-
-2. **Access Parse Dashboard**:
-
-   ```
-   http://$PARSE_DASHBOARD_DNS:4040
-   ```
-
----
-
-## **Step 9: Clean Up (Optional)**
-
-To remove all resources when no longer needed:
-
-```bash
-az group delete --name TikTik_Multi_2_RG --yes --no-wait
-```
-
----
-
-## **Troubleshooting**
-
-- **Check container logs**:
+- View container logs:
 
   ```bash
-  az container logs --name mongodb --resource-group TikTik_Multi_2_RG
-  az container logs --name parse-server --resource-group TikTik_Multi_2_RG
-  az container logs --name parse-dashboard --resource-group TikTik_Multi_2_RG
+  az container logs --name mongodb --resource-group TikTik_Multi_3_RG
+  az container logs --name parse-server --resource-group TikTik_Multi_3_RG
+  az container logs --name parse-dashboard --resource-group TikTik_Multi_3_RG
   ```
 
-- **Restart containers**:
-
-  ```bash
-  az container restart --name mongodb --resource-group TikTik_Multi_2_RG
-  ```
+- Redeploy a single component by rerunning its script.
+- Ensure `.env` contains all required keys; the scripts will stop early if any are missing.
 
 ---
 
-## **Notes**
-
-- **Data Persistence**: MongoDB data is stored in Azure Files. Ensure backups are taken regularly.
-- **Security**: Restrict access to your containers using Azure Firewall or Network Security Groups (NSGs).
-- **Cost Monitoring**: Use the Azure Pricing Calculator to estimate costs for your deployment.
+Happy deploying!

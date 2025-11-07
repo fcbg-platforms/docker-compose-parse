@@ -5,7 +5,7 @@ properties:
   containers:
     - name: parse-server
       properties:
-        image: parseplatform/parse-server:8.3.0
+        image: parseplatform/parse-server:latest
         ports:
           - port: 1337
             protocol: TCP
@@ -29,8 +29,7 @@ properties:
   ipAddress:
     type: Public
     ports:
-      - protocol: TCP
-        port: 1337
+      - port: 1337
     dnsNameLabel: parse-server-__RANDOM__
 tags: {}
 type: Microsoft.ContainerInstance/containerGroups

@@ -12,7 +12,7 @@ STORAGE_ACCOUNT_NAME=${STORAGE_ACCOUNT_NAME:-tiktikstorage8040}
 echo "Checking if storage account exists..."
 STORAGE_EXISTS=$(az storage account show \
   --name "$STORAGE_ACCOUNT_NAME" \
-  --resource-group TikTik_Multi_2_RG \
+  --resource-group TikTik_Multi_3_RG \
   --query "name" \
   --output tsv 2>/dev/null)
 
@@ -20,7 +20,7 @@ if [ -z "$STORAGE_EXISTS" ]; then
     echo "Storage account not found. Creating storage account..."
     az storage account create \
       --name "$STORAGE_ACCOUNT_NAME" \
-      --resource-group TikTik_Multi_2_RG \
+      --resource-group TikTik_Multi_3_RG \
       --location switzerlandnorth \
       --sku Standard_LRS
     
@@ -60,7 +60,7 @@ fi
 echo "Retrieving storage account key..."
 STORAGE_KEY=$(az storage account keys list \
   --account-name "$STORAGE_ACCOUNT_NAME" \
-  --resource-group TikTik_Multi_2_RG \
+  --resource-group TikTik_Multi_3_RG \
   --query "[0].value" \
   --output tsv)
 
@@ -82,7 +82,7 @@ sed "s|__RANDOM__|${RANDOM}|g" > "$TEMP_FILE"
 
 # Deploy the container
 echo "Deploying MongoDB container..."
-az container create --resource-group TikTik_Multi_2_RG --file "$TEMP_FILE"
+az container create --resource-group TikTik_Multi_3_RG --file "$TEMP_FILE"
 
 # Capture the result
 RESULT=$?
@@ -96,7 +96,7 @@ if [ $RESULT -eq 0 ]; then
     # Get MongoDB DNS name
     MONGODB_DNS=$(az container show \
       --name mongodb \
-      --resource-group TikTik_Multi_2_RG \
+      --resource-group TikTik_Multi_3_RG \
       --query ipAddress.fqdn \
       --output tsv)
     

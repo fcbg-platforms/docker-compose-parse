@@ -33,8 +33,7 @@ properties:
   ipAddress:
     type: Public
     ports:
-      - protocol: TCP
-        port: 4040
+      - port: 4040
     dnsNameLabel: parse-dashboard-__RANDOM__
 tags: {}
 type: Microsoft.ContainerInstance/containerGroups
