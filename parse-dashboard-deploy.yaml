@@ -11,19 +11,19 @@ properties:
             protocol: TCP
         environmentVariables:
           - name: PARSE_DASHBOARD_SERVER_URL
-            value: __SERVER_URL__
+            value: "__SERVER_URL__"
           - name: PARSE_DASHBOARD_APP_ID
-            value: __APP_ID__
+            value: "__APP_ID__"
           - name: PARSE_DASHBOARD_MASTER_KEY
-            secureValue: __MASTER_KEY__
+            secureValue: "__MASTER_KEY__"
           - name: PARSE_DASHBOARD_APP_NAME
-            value: __APP_NAME__
+            value: "__APP_NAME__"
           - name: PARSE_DASHBOARD_ALLOW_INSECURE_HTTP
             value: "__ALLOW_INSECURE__"
           - name: PARSE_DASHBOARD_USER_ID
-            value: __USER_ID__
+            value: "__USER_ID__"
           - name: PARSE_DASHBOARD_USER_PASSWORD
-            secureValue: __USER_PASSWORD__
+            secureValue: "__USER_PASSWORD__"
         resources:
           requests:
             cpu: 0.5

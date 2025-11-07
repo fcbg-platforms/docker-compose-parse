@@ -35,8 +35,6 @@ sed "s|__APP_ID__|${PARSE_SERVER_APPLICATION_ID}|g" parse-server-deploy.yaml | \
 sed "s|__MASTER_KEY__|${PARSE_SERVER_MASTER_KEY}|g" | \
 sed "s|__DATABASE_URI__|${PARSE_SERVER_DATABASE_URI}|g" | \
 sed "s|__SERVER_URL__|${PARSE_SERVER_URL}|g" | \
-sed "s|__CLOUD__|${PARSE_SERVER_CLOUD}|g" | \
-sed "s|__MASTER_KEY_IPS__|${PARSE_SERVER_MASTER_KEY_IPS}|g" | \
 sed "s|__RANDOM__|${RANDOM}|g" > "$TEMP_FILE"
 
 # Deploy the container

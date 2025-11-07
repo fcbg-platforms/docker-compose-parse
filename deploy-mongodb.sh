@@ -5,13 +5,78 @@ set -a
 source .env
 set +a
 
+# Use STORAGE_ACCOUNT_NAME from .env or default
+STORAGE_ACCOUNT_NAME=${STORAGE_ACCOUNT_NAME:-tiktikstorage8040}
+
+# Check if storage account exists, create if not
+echo "Checking if storage account exists..."
+STORAGE_EXISTS=$(az storage account show \
+  --name "$STORAGE_ACCOUNT_NAME" \
+  --resource-group TikTik_Multi_2_RG \
+  --query "name" \
+  --output tsv 2>/dev/null)
+
+if [ -z "$STORAGE_EXISTS" ]; then
+    echo "Storage account not found. Creating storage account..."
+    az storage account create \
+      --name "$STORAGE_ACCOUNT_NAME" \
+      --resource-group TikTik_Multi_2_RG \
+      --location switzerlandnorth \
+      --sku Standard_LRS
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to create storage account!"
+        exit 1
+    fi
+    echo "✓ Storage account created"
+else
+    echo "✓ Storage account already exists"
+fi
+
+# Check if file share exists, create if not
+echo "Checking if file share exists..."
+SHARE_EXISTS=$(az storage share exists \
+  --name mongodb-data \
+  --account-name "$STORAGE_ACCOUNT_NAME" \
+  --query "exists" \
+  --output tsv 2>/dev/null)
+
+if [ "$SHARE_EXISTS" != "true" ]; then
+    echo "File share not found. Creating file share..."
+    az storage share create \
+      --name mongodb-data \
+      --account-name "$STORAGE_ACCOUNT_NAME"
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to create file share!"
+        exit 1
+    fi
+    echo "✓ File share created"
+else
+    echo "✓ File share already exists"
+fi
+
+# Get storage account key
+echo "Retrieving storage account key..."
+STORAGE_KEY=$(az storage account keys list \
+  --account-name "$STORAGE_ACCOUNT_NAME" \
+  --resource-group TikTik_Multi_2_RG \
+  --query "[0].value" \
+  --output tsv)
+
+if [ -z "$STORAGE_KEY" ]; then
+    echo "Error: Failed to retrieve storage account key!"
+    exit 1
+fi
+echo "✓ Storage key retrieved"
+
 # Create a temporary deployment file
 TEMP_FILE="mongodb-deploy-generated.yaml"
 
 # Replace placeholders with actual values
 sed "s|__MONGO_USERNAME__|${MONGO_INITDB_ROOT_USERNAME}|g" mongodb-deploy.yaml | \
 sed "s|__MONGO_PASSWORD__|${MONGO_INITDB_ROOT_PASSWORD}|g" | \
-sed "s|__STORAGE_ACCOUNT__|tiktikstorage8040|g" | \
+sed "s|__STORAGE_ACCOUNT__|${STORAGE_ACCOUNT_NAME}|g" | \
 sed "s|__STORAGE_KEY__|${STORAGE_KEY}|g" | \
 sed "s|__RANDOM__|${RANDOM}|g" > "$TEMP_FILE"
 

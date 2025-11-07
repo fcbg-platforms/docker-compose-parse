@@ -11,9 +11,9 @@ properties:
             protocol: TCP
         environmentVariables:
           - name: MONGO_INITDB_ROOT_USERNAME
-            value: __MONGO_USERNAME__
+            value: "__MONGO_USERNAME__"
           - name: MONGO_INITDB_ROOT_PASSWORD
-            secureValue: __MONGO_PASSWORD__
+            secureValue: "__MONGO_PASSWORD__"
         resources:
           requests:
             cpu: 1.0
