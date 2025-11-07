@@ -1,0 +1,39 @@
+apiVersion: 2019-12-01
+location: switzerlandnorth
+name: mongodb
+properties:
+  containers:
+    - name: mongodb
+      properties:
+        image: mongo:8.2.1
+        ports:
+          - port: 27017
+            protocol: TCP
+        environmentVariables:
+          - name: MONGO_INITDB_ROOT_USERNAME
+            value: __MONGO_USERNAME__
+          - name: MONGO_INITDB_ROOT_PASSWORD
+            secureValue: __MONGO_PASSWORD__
+        resources:
+          requests:
+            cpu: 1.0
+            memoryInGB: 1.5
+        volumeMounts:
+          - name: mongodb-data
+            mountPath: /data/db
+  osType: Linux
+  restartPolicy: Always
+  ipAddress:
+    type: Public
+    ports:
+      - protocol: TCP
+        port: 27017
+    dnsNameLabel: mongodb-__RANDOM__
+  volumes:
+    - name: mongodb-data
+      azureFile:
+        shareName: mongodb-data
+        storageAccountName: __STORAGE_ACCOUNT__
+        storageAccountKey: __STORAGE_KEY__
+tags: {}
+type: Microsoft.ContainerInstance/containerGroups
