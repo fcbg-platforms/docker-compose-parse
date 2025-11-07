@@ -1,5 +1,5 @@
 apiVersion: 2019-12-01
-location: switzerlandnorth
+location: __LOCATION__
 name: mongodb
 properties:
   containers:
@@ -27,6 +27,7 @@ properties:
     type: Public
     ports:
       - port: 27017
+        protocol: TCP
     dnsNameLabel: mongodb-__RANDOM__
   volumes:
     - name: mongodb-data

@@ -1,11 +1,11 @@
 apiVersion: 2019-12-01
-location: switzerlandnorth
+location: __LOCATION__
 name: parse-server
 properties:
   containers:
     - name: parse-server
       properties:
-        image: parseplatform/parse-server:latest
+        image: parseplatform/parse-server:8.3.0
         ports:
           - port: 1337
             protocol: TCP
@@ -30,6 +30,7 @@ properties:
     type: Public
     ports:
       - port: 1337
+        protocol: TCP
     dnsNameLabel: parse-server-__RANDOM__
 tags: {}
 type: Microsoft.ContainerInstance/containerGroups

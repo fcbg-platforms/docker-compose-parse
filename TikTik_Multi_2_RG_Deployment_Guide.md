@@ -1,4 +1,4 @@
-# TikTik_Multi_3_RG: Parse Server Deployment Guide (Azure ACI)
+# TikTik_Multi_2_RG: Parse Server Deployment Guide (Azure ACI)
 
 This guide explains how to deploy MongoDB, Parse Server, and Parse Dashboard to **Azure Container Instances (ACI)** in **Switzerland North** using the helper scripts bundled with this project.
 
@@ -7,7 +7,7 @@ This guide explains how to deploy MongoDB, Parse Server, and Parse Dashboard to 
 ## Prerequisites
 
 - Azure CLI installed and logged in: `az login`
-- `.env` file beside the scripts (use `.env.example` as a template)
+- `.env` file beside the scripts (use `.env.example` as a template). At minimum set `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD`, `RESOURCE_GROUP_NAME`, and `AZURE_REGION` (defaults are provided).
 - MongoDB backup reachable from Azure (optional if you plan to restore data)
 - Bash shell (Git Bash, WSL, or Azure Cloud Shell)
 
@@ -30,11 +30,12 @@ Run the master script; it orchestrates storage provisioning, MongoDB, Parse Serv
 The script will:
 
 1. Load variables from `.env`
-2. Ensure the storage account and file share exist
-3. Deploy MongoDB and wait for a public FQDN
-4. Deploy Parse Server (using the discovered MongoDB DNS)
-5. Deploy Parse Dashboard (using the discovered Parse Server DNS)
-6. Print the public endpoints at the end
+2. Ensure the Azure resource group exists (creates it if missing)
+3. Ensure the storage account and file share exist
+4. Deploy MongoDB and wait for a public FQDN
+5. Deploy Parse Server (using the discovered MongoDB DNS)
+6. Deploy Parse Dashboard (using the discovered Parse Server DNS)
+7. Print the public endpoints at the end
 
 Keep the terminal open until the script finishes.
 
@@ -68,9 +69,10 @@ Use the credentials from your `.env` file to sign in to the dashboard.
 If the terminal output was closed, query Azure for the endpoints:
 
 ```bash
-az container show --name mongodb --resource-group TikTik_Multi_3_RG --query ipAddress.fqdn -o tsv
-az container show --name parse-server --resource-group TikTik_Multi_3_RG --query ipAddress.fqdn -o tsv
-az container show --name parse-dashboard --resource-group TikTik_Multi_3_RG --query ipAddress.fqdn -o tsv
+RG=${RESOURCE_GROUP_NAME:-TikTik_Multi_2_RG}
+az container show --name mongodb --resource-group "$RG" --query ipAddress.fqdn -o tsv
+az container show --name parse-server --resource-group "$RG" --query ipAddress.fqdn -o tsv
+az container show --name parse-dashboard --resource-group "$RG" --query ipAddress.fqdn -o tsv
 ```
 
 ---
@@ -89,7 +91,7 @@ ACI does not provide TLS termination. To expose HTTPS you can either:
 Remove every deployed resource when finished:
 
 ```bash
-az group delete --name TikTik_Multi_3_RG --yes --no-wait
+az group delete --name ${RESOURCE_GROUP_NAME:-TikTik_Multi_2_RG} --yes --no-wait
 ```
 
 ---
@@ -99,9 +101,10 @@ az group delete --name TikTik_Multi_3_RG --yes --no-wait
 - View container logs:
 
   ```bash
-  az container logs --name mongodb --resource-group TikTik_Multi_3_RG
-  az container logs --name parse-server --resource-group TikTik_Multi_3_RG
-  az container logs --name parse-dashboard --resource-group TikTik_Multi_3_RG
+  RG=${RESOURCE_GROUP_NAME:-TikTik_Multi_2_RG}
+  az container logs --name mongodb --resource-group "$RG"
+  az container logs --name parse-server --resource-group "$RG"
+  az container logs --name parse-dashboard --resource-group "$RG"
   ```
 
 - Redeploy a single component by rerunning its script.

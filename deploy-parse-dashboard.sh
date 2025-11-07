@@ -5,12 +5,28 @@ set -a
 source .env
 set +a
 
+# Set defaults if not provided
+RESOURCE_GROUP_NAME=${RESOURCE_GROUP_NAME:-TikTik_Multi_2_RG}
+AZURE_REGION=${AZURE_REGION:-switzerlandnorth}
+
+# Ensure the resource group exists
+echo "Ensuring resource group ${RESOURCE_GROUP_NAME} exists..."
+if ! az group show --name "${RESOURCE_GROUP_NAME}" > /dev/null 2>&1; then
+  echo "Creating resource group ${RESOURCE_GROUP_NAME} in ${AZURE_REGION}..."
+  az group create --name "${RESOURCE_GROUP_NAME}" --location "${AZURE_REGION}" > /dev/null
+  if [ $? -ne 0 ]; then
+    echo "Failed to create resource group ${RESOURCE_GROUP_NAME}!"
+    exit 1
+  fi
+fi
+echo "✓ Resource group ready"
+
 # Get Parse Server DNS (should be set from previous deployment)
 if [ -z "$PARSE_SERVER_DNS" ]; then
     echo "Getting Parse Server DNS..."
     PARSE_SERVER_DNS=$(az container show \
       --name parse-server \
-      --resource-group TikTik_Multi_3_RG \
+    --resource-group "${RESOURCE_GROUP_NAME}" \
       --query ipAddress.fqdn \
       --output tsv)
     
@@ -36,11 +52,12 @@ sed "s|__APP_NAME__|${PARSE_DASHBOARD_APP_NAME}|g" | \
 sed "s|__ALLOW_INSECURE__|${PARSE_DASHBOARD_ALLOW_INSECURE_HTTP}|g" | \
 sed "s|__USER_ID__|${PARSE_DASHBOARD_USER_ID}|g" | \
 sed "s|__USER_PASSWORD__|${PARSE_DASHBOARD_USER_PASSWORD}|g" | \
+sed "s|__LOCATION__|${AZURE_REGION}|g" | \
 sed "s|__RANDOM__|${RANDOM}|g" > "$TEMP_FILE"
 
 # Deploy the container
 echo "Deploying Parse Dashboard container..."
-az container create --resource-group TikTik_Multi_3_RG --file "$TEMP_FILE"
+az container create --resource-group "${RESOURCE_GROUP_NAME}" --file "$TEMP_FILE"
 
 # Capture the result
 RESULT=$?
@@ -54,7 +71,7 @@ if [ $RESULT -eq 0 ]; then
     # Get Parse Dashboard DNS name
     PARSE_DASHBOARD_DNS=$(az container show \
       --name parse-dashboard \
-      --resource-group TikTik_Multi_3_RG \
+      --resource-group "${RESOURCE_GROUP_NAME}" \
       --query ipAddress.fqdn \
       --output tsv)
     

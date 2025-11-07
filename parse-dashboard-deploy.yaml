@@ -1,5 +1,5 @@
 apiVersion: 2019-12-01
-location: switzerlandnorth
+location: __LOCATION__
 name: parse-dashboard
 properties:
   containers:
@@ -34,6 +34,7 @@ properties:
     type: Public
     ports:
       - port: 4040
+        protocol: TCP
     dnsNameLabel: parse-dashboard-__RANDOM__
 tags: {}
 type: Microsoft.ContainerInstance/containerGroups

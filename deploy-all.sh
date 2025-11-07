@@ -25,6 +25,23 @@ set +a
 echo "✓ Environment variables loaded"
 echo ""
 
+# Set defaults if not provided
+RESOURCE_GROUP_NAME=${RESOURCE_GROUP_NAME:-TikTik_Multi_2_RG}
+AZURE_REGION=${AZURE_REGION:-switzerlandnorth}
+
+# Ensure the resource group exists
+echo "Ensuring resource group ${RESOURCE_GROUP_NAME} exists..."
+if ! az group show --name "${RESOURCE_GROUP_NAME}" > /dev/null 2>&1; then
+    echo "Creating resource group ${RESOURCE_GROUP_NAME} in ${AZURE_REGION}..."
+    az group create --name "${RESOURCE_GROUP_NAME}" --location "${AZURE_REGION}" > /dev/null
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to create resource group ${RESOURCE_GROUP_NAME}."
+        exit 1
+    fi
+fi
+echo "✓ Resource group ready"
+echo ""
+
 # Check if Azure CLI is logged in
 echo "Checking Azure CLI authentication..."
 az account show > /dev/null 2>&1
@@ -86,13 +103,13 @@ echo ""
 echo "Your Parse Server stack has been deployed successfully."
 echo ""
 echo "To view your containers:"
-echo "  az container list --resource-group TikTik_Multi_3_RG --output table"
+echo "  az container list --resource-group ${RESOURCE_GROUP_NAME} --output table"
 echo ""
 echo "To check logs:"
-echo "  az container logs --name mongodb --resource-group TikTik_Multi_3_RG"
-echo "  az container logs --name parse-server --resource-group TikTik_Multi_3_RG"
-echo "  az container logs --name parse-dashboard --resource-group TikTik_Multi_3_RG"
+echo "  az container logs --name mongodb --resource-group ${RESOURCE_GROUP_NAME}"
+echo "  az container logs --name parse-server --resource-group ${RESOURCE_GROUP_NAME}"
+echo "  az container logs --name parse-dashboard --resource-group ${RESOURCE_GROUP_NAME}"
 echo ""
 echo "To delete all resources:"
-echo "  az group delete --name TikTik_Multi_3_RG --yes --no-wait"
+echo "  az group delete --name ${RESOURCE_GROUP_NAME} --yes --no-wait"
 echo ""
