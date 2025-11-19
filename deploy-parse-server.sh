@@ -44,6 +44,15 @@ if [ -z "$PARSE_SERVER_DATABASE_URI" ]; then
     PARSE_SERVER_DATABASE_URI="mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@${MONGODB_DNS}:27017/${PARSE_SERVER_DATABASE_NAME}?authSource=admin"
 fi
 
+# Generate a random identifier for the DNS label
+RANDOM_ID=${RANDOM}
+
+# Build PARSE_SERVER_URL for Azure (use the FQDN that will be created)
+PARSE_SERVER_FQDN="parse-server-${RANDOM_ID}.${AZURE_REGION}.azurecontainer.io"
+PARSE_SERVER_URL_AZURE="http://${PARSE_SERVER_FQDN}:1337/parse"
+
+echo "Parse Server will be accessible at: $PARSE_SERVER_URL_AZURE"
+
 # Create a temporary deployment file
 TEMP_FILE="parse-server-deploy-generated.yaml"
 
@@ -51,9 +60,9 @@ TEMP_FILE="parse-server-deploy-generated.yaml"
 sed "s|__APP_ID__|${PARSE_SERVER_APPLICATION_ID}|g" parse-server-deploy.yaml | \
 sed "s|__MASTER_KEY__|${PARSE_SERVER_MASTER_KEY}|g" | \
 sed "s|__DATABASE_URI__|${PARSE_SERVER_DATABASE_URI}|g" | \
-sed "s|__SERVER_URL__|${PARSE_SERVER_URL}|g" | \
+sed "s|__SERVER_URL__|${PARSE_SERVER_URL_AZURE}|g" | \
 sed "s|__LOCATION__|${AZURE_REGION}|g" | \
-sed "s|__RANDOM__|${RANDOM}|g" > "$TEMP_FILE"
+sed "s|__RANDOM__|${RANDOM_ID}|g" > "$TEMP_FILE"
 
 # Deploy the container
 echo "Deploying Parse Server container..."
