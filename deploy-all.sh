@@ -52,20 +52,37 @@ fi
 echo "✓ Azure CLI authenticated"
 echo ""
 
-# Deploy MongoDB
+# Deploy Database (Cosmos DB or MongoDB)
 echo "======================================"
-echo "Step 1: Deploying MongoDB..."
+echo "Step 1: Deploying Database..."
 echo "======================================"
-bash deploy-mongodb.sh
-if [ $? -ne 0 ]; then
-    echo "MongoDB deployment failed. Exiting."
-    exit 1
-fi
-echo ""
 
-# Wait for MongoDB to be ready
-echo "Waiting 30 seconds for MongoDB to initialize..."
-sleep 30
+# Check if using Cosmos DB or MongoDB container
+if [ -n "$COSMOS_DB_ACCOUNT_NAME" ] && [ -z "$PARSE_SERVER_DATABASE_URI" ]; then
+    echo "Deploying Azure Cosmos DB for MongoDB API..."
+    bash deploy-cosmosdb.sh
+    if [ $? -ne 0 ]; then
+        echo "Cosmos DB deployment failed. Exiting."
+        exit 1
+    fi
+    echo ""
+    echo "⚠ IMPORTANT: Please update your .env file with the PARSE_SERVER_DATABASE_URI"
+    echo "provided by deploy-cosmosdb.sh, then run this script again."
+    exit 0
+elif [[ "$PARSE_SERVER_DATABASE_URI" == *".mongo.cosmos.azure.com"* ]]; then
+    echo "✓ Using existing Cosmos DB configuration"
+    echo "  Connection: Cosmos DB for MongoDB API"
+else
+    echo "⚠ Using MongoDB container (not recommended for production)"
+    bash deploy-mongodb.sh
+    if [ $? -ne 0 ]; then
+        echo "MongoDB deployment failed. Exiting."
+        exit 1
+    fi
+    echo ""
+    echo "Waiting 30 seconds for MongoDB to initialize..."
+    sleep 30
+fi
 echo ""
 
 # Deploy Parse Server
@@ -106,7 +123,6 @@ echo "To view your containers:"
 echo "  az container list --resource-group ${RESOURCE_GROUP_NAME} --output table"
 echo ""
 echo "To check logs:"
-echo "  az container logs --name mongodb --resource-group ${RESOURCE_GROUP_NAME}"
 echo "  az container logs --name parse-server --resource-group ${RESOURCE_GROUP_NAME}"
 echo "  az container logs --name parse-dashboard --resource-group ${RESOURCE_GROUP_NAME}"
 echo ""

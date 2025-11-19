@@ -22,26 +22,45 @@ if ! az group show --name "${RESOURCE_GROUP_NAME}" > /dev/null 2>&1; then
 fi
 echo "✓ Resource group ready"
 
-# Get MongoDB DNS (should be set from previous deployment)
-if [ -z "$MONGODB_DNS" ]; then
-    echo "Getting MongoDB DNS..."
-    MONGODB_DNS=$(az container show \
-      --name mongodb \
-      --resource-group "${RESOURCE_GROUP_NAME}" \
-      --query ipAddress.fqdn \
-      --output tsv)
-    
-    if [ -z "$MONGODB_DNS" ]; then
-        echo "Error: MongoDB container not found. Please deploy MongoDB first."
-        exit 1
-    fi
-fi
-
-echo "MongoDB DNS: $MONGODB_DNS"
-
 # Build the DATABASE_URI if not already set
 if [ -z "$PARSE_SERVER_DATABASE_URI" ]; then
-    PARSE_SERVER_DATABASE_URI="mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@${MONGODB_DNS}:27017/${PARSE_SERVER_DATABASE_NAME}?authSource=admin"
+    # Check if using Cosmos DB or MongoDB container
+    if [ -n "$COSMOS_DB_ACCOUNT_NAME" ]; then
+        echo "Error: PARSE_SERVER_DATABASE_URI is not set."
+        echo "Please run ./deploy-cosmosdb.sh first to create Cosmos DB and get the connection string."
+        echo "Then update your .env file with the PARSE_SERVER_DATABASE_URI value."
+        exit 1
+    else
+        # Fallback to MongoDB container (for local development)
+        echo "⚠ Warning: Using MongoDB container mode (not recommended for production)"
+
+        if [ -z "$MONGODB_DNS" ]; then
+            echo "Getting MongoDB DNS..."
+            MONGODB_DNS=$(az container show \
+              --name mongodb \
+              --resource-group "${RESOURCE_GROUP_NAME}" \
+              --query ipAddress.fqdn \
+              --output tsv 2>/dev/null)
+
+            if [ -z "$MONGODB_DNS" ]; then
+                echo "Error: MongoDB container not found and no Cosmos DB configured."
+                echo "Please either:"
+                echo "  1. Run ./deploy-cosmosdb.sh to set up Cosmos DB (recommended)"
+                echo "  2. Run ./deploy-mongodb.sh to deploy MongoDB container"
+                exit 1
+            fi
+        fi
+
+        echo "MongoDB DNS: $MONGODB_DNS"
+        PARSE_SERVER_DATABASE_URI="mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@${MONGODB_DNS}:27017/${PARSE_SERVER_DATABASE_NAME}?authSource=admin"
+    fi
+else
+    # DATABASE_URI is set, check if it's Cosmos DB or MongoDB
+    if [[ "$PARSE_SERVER_DATABASE_URI" == *".mongo.cosmos.azure.com"* ]]; then
+        echo "✓ Using Azure Cosmos DB for MongoDB API"
+    else
+        echo "✓ Using custom DATABASE_URI"
+    fi
 fi
 
 # Generate a random identifier for the DNS label
