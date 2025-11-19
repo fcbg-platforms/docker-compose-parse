@@ -47,7 +47,6 @@ else
       --kind MongoDB \
       --locations "regionName=${AZURE_REGION}" \
       --default-consistency-level "Session" \
-      --enable-public-network true \
       --enable-automatic-failover false \
       --output json > /dev/null
 
@@ -95,8 +94,14 @@ if [ -z "${COSMOS_CONNECTION_STRING}" ]; then
 fi
 
 # Format the connection string for Parse Server
-# Cosmos DB connection string already includes most parameters, we just need to append database name
-PARSE_SERVER_DATABASE_URI="${COSMOS_CONNECTION_STRING}&appName=ParseServer"
+# Azure provides: mongodb://account:key@account.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=@account@
+# We need to: 1) Remove the existing appName parameter, 2) Add database name before the ?, 3) Add our own appName
+
+# Remove existing appName parameter and extract base connection
+BASE_CONNECTION=$(echo "${COSMOS_CONNECTION_STRING}" | sed 's/&appName=[^&]*//g')
+
+# Insert database name '/parse' before the '?'
+PARSE_SERVER_DATABASE_URI=$(echo "${BASE_CONNECTION}" | sed 's|\(.*\)/?|\1/parse?|')&appName=ParseServer"
 
 # Get the host for display
 COSMOS_HOST=$(echo "${COSMOS_CONNECTION_STRING}" | sed -n 's/.*@\([^:]*\):.*/\1/p')

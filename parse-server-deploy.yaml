@@ -26,6 +26,10 @@ properties:
             value: "X-Parse-Master-Key, X-Parse-REST-API-Key, X-Parse-Javascript-Key, X-Parse-Application-Id, X-Parse-Client-Version, X-Parse-Session-Token, X-Requested-With, X-Parse-Revocable-Session, X-Parse-Request-Id, Content-Type, Pragma, Cache-Control"
           - name: PARSE_SERVER_ALLOW_CLIENT_CLASS_CREATION
             value: "true"
+          - name: VERBOSE
+            value: "1"
+          - name: PARSE_SERVER_LOG_LEVEL
+            value: "verbose"
         resources:
           requests:
             cpu: 1.0

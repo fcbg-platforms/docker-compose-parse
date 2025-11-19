@@ -14,10 +14,14 @@ PARSE_SERVER_DATABASE_NAME=${PARSE_SERVER_DATABASE_NAME:-parse}
 echo "Ensuring resource group ${RESOURCE_GROUP_NAME} exists..."
 if ! az group show --name "${RESOURCE_GROUP_NAME}" > /dev/null 2>&1; then
     echo "Creating resource group ${RESOURCE_GROUP_NAME} in ${AZURE_REGION}..."
-    az group create --name "${RESOURCE_GROUP_NAME}" --location "${AZURE_REGION}" > /dev/null
+    az group create --name "${RESOURCE_GROUP_NAME}" --location "${AZURE_REGION}" > /dev/null 2>&1
     if [ $? -ne 0 ]; then
-        echo "Failed to create resource group ${RESOURCE_GROUP_NAME}!"
-        exit 1
+        echo "⚠ Warning: Could not create resource group (may already exist or permissions issue)"
+        # Check again if it exists despite the error
+        if ! az group show --name "${RESOURCE_GROUP_NAME}" > /dev/null 2>&1; then
+            echo "Failed to create resource group ${RESOURCE_GROUP_NAME}!"
+            exit 1
+        fi
     fi
 fi
 echo "✓ Resource group ready"
@@ -75,10 +79,13 @@ echo "Parse Server will be accessible at: $PARSE_SERVER_URL_AZURE"
 # Create a temporary deployment file
 TEMP_FILE="parse-server-deploy-generated.yaml"
 
+# Escape special characters in DATABASE_URI for sed (& and \ need escaping)
+DATABASE_URI_ESCAPED=$(echo "${PARSE_SERVER_DATABASE_URI}" | sed 's/[&/\]/\\&/g')
+
 # Replace placeholders with actual values
 sed "s|__APP_ID__|${PARSE_SERVER_APPLICATION_ID}|g" parse-server-deploy.yaml | \
 sed "s|__MASTER_KEY__|${PARSE_SERVER_MASTER_KEY}|g" | \
-sed "s|__DATABASE_URI__|${PARSE_SERVER_DATABASE_URI}|g" | \
+sed "s|__DATABASE_URI__|${DATABASE_URI_ESCAPED}|g" | \
 sed "s|__SERVER_URL__|${PARSE_SERVER_URL_AZURE}|g" | \
 sed "s|__LOCATION__|${AZURE_REGION}|g" | \
 sed "s|__RANDOM__|${RANDOM_ID}|g" > "$TEMP_FILE"
