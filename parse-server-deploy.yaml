@@ -20,6 +20,8 @@ properties:
             value: "__DATABASE_URI__"
           - name: PARSE_SERVER_URL
             value: "__SERVER_URL__"
+          - name: PARSE_SERVER_ALLOW_ORIGIN
+            value: "*"
         resources:
           requests:
             cpu: 1.0
