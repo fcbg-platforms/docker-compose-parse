@@ -1,0 +1,78 @@
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    restart: always
+    # Note: MongoDB port is NOT exposed publicly for security
+    # It's only accessible within the Docker network
+    volumes:
+      - /mnt/parse-data/mongodb:/data/db
+      - /mnt/parse-data/mongo-config:/data/configdb
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+    networks:
+      - parse-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  parse-server:
+    container_name: parse-server
+    image: parseplatform/parse-server:8.4.0
+    restart: always
+    ports:
+      - "1337:1337"
+    volumes:
+      - /mnt/parse-data/config-vol:/parse-server/config
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      - PORT=1337
+      - PARSE_SERVER_APPLICATION_ID=${PARSE_SERVER_APPLICATION_ID}
+      - PARSE_SERVER_MASTER_KEY=${PARSE_SERVER_MASTER_KEY}
+      - PARSE_SERVER_DATABASE_URI=${PARSE_SERVER_DATABASE_URI}
+      - PARSE_SERVER_URL=${PARSE_SERVER_URL}
+      - PARSE_SERVER_MASTER_KEY_IPS=${PARSE_SERVER_MASTER_KEY_IPS:-}
+      - PARSE_SERVER_ALLOW_ORIGIN=*
+      - PARSE_SERVER_ALLOW_HEADERS=X-Parse-Master-Key, X-Parse-REST-API-Key, X-Parse-Javascript-Key, X-Parse-Application-Id, X-Parse-Client-Version, X-Parse-Session-Token, X-Requested-With, X-Parse-Revocable-Session, X-Parse-Request-Id, Content-Type, Pragma, Cache-Control
+      - PARSE_SERVER_ALLOW_CLIENT_CLASS_CREATION=true
+    networks:
+      - parse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:1337/parse/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  parse-dashboard:
+    container_name: parse-dashboard
+    image: parseplatform/parse-dashboard:8.0.0
+    restart: always
+    ports:
+      - "4040:4040"
+    depends_on:
+      parse-server:
+        condition: service_healthy
+    environment:
+      - PARSE_DASHBOARD_SERVER_URL=${PARSE_SERVER_URL}
+      - PARSE_DASHBOARD_APP_ID=${PARSE_SERVER_APPLICATION_ID}
+      - PARSE_DASHBOARD_MASTER_KEY=${PARSE_SERVER_MASTER_KEY}
+      - PARSE_DASHBOARD_APP_NAME=${PARSE_DASHBOARD_APP_NAME}
+      - PARSE_DASHBOARD_ALLOW_INSECURE_HTTP=${PARSE_DASHBOARD_ALLOW_INSECURE_HTTP}
+      - PARSE_DASHBOARD_USER_ID=${PARSE_DASHBOARD_USER_ID}
+      - PARSE_DASHBOARD_USER_PASSWORD=${PARSE_DASHBOARD_USER_PASSWORD}
+    networks:
+      - parse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4040', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  parse-network:
+    driver: bridge
