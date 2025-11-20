@@ -1,0 +1,134 @@
+services:
+  # Nginx reverse proxy to simulate Azure external FQDN access
+  # This forces Dashboard to connect to Parse Server via HTTP (not internal Docker DNS)
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: diagnostic-nginx-proxy
+    ports:
+      - "8080:8080"  # Proxy for Parse Server
+    networks:
+      - proxy-network
+      - parse-server-network
+    volumes:
+      - ./diagnostic-nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - parse-server
+    restart: unless-stopped
+
+  # Parse Server - connects to REMOTE Cosmos DB
+  # Using 5.5.0 - Cosmos DB MongoDB API has limitations (no collation support)
+  # Even with 4.2 API, Parse Server 8.x requires features Cosmos DB doesn't support
+  parse-server:
+    image: parseplatform/parse-server:5.5.0
+    container_name: diagnostic-parse-server
+    networks:
+      - parse-server-network
+    environment:
+      # Core Configuration
+      PORT: 1337
+      PARSE_SERVER_APPLICATION_ID: ${PARSE_SERVER_APPLICATION_ID}
+      PARSE_SERVER_MASTER_KEY: ${PARSE_SERVER_MASTER_KEY}
+
+      # Database - REMOTE Cosmos DB (same as Azure)
+      PARSE_SERVER_DATABASE_URI: ${PARSE_SERVER_DATABASE_URI}
+
+      # Server URL - simulates Azure FQDN
+      PARSE_SERVER_URL: http://localhost:8080/parse
+
+      # CORS Configuration (same as Azure)
+      PARSE_SERVER_ALLOW_ORIGIN: "*"
+      PARSE_SERVER_ALLOW_HEADERS: "X-Parse-Master-Key, X-Parse-REST-API-Key, X-Parse-Javascript-Key, X-Parse-Application-Id, X-Parse-Client-Version, X-Parse-Session-Token, X-Requested-With, X-Parse-Revocable-Session, X-Parse-Request-Id, Content-Type, Pragma, Cache-Control"
+      PARSE_SERVER_ALLOW_CLIENT_CLASS_CREATION: "true"
+
+      # Verbose Logging for Diagnostics
+      VERBOSE: "1"
+      PARSE_SERVER_LOG_LEVEL: verbose
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:1337/parse/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Parse Dashboard - connects to Parse Server via nginx proxy (simulates Azure setup)
+  parse-dashboard:
+    image: parseplatform/parse-dashboard:8.0.0
+    container_name: diagnostic-parse-dashboard
+    ports:
+      - "4040:4040"
+    networks:
+      - proxy-network  # Dashboard in separate network, uses proxy
+    environment:
+      # Dashboard connects via proxy (simulates Azure external connection)
+      PARSE_DASHBOARD_SERVER_URL: http://nginx-proxy:8080/parse
+      PARSE_DASHBOARD_APP_ID: ${PARSE_SERVER_APPLICATION_ID}
+      PARSE_DASHBOARD_MASTER_KEY: ${PARSE_SERVER_MASTER_KEY}
+      PARSE_DASHBOARD_APP_NAME: ${PARSE_DASHBOARD_APP_NAME}
+      PARSE_DASHBOARD_ALLOW_INSECURE_HTTP: "1"
+      PARSE_DASHBOARD_USER_ID: ${PARSE_DASHBOARD_USER_ID}
+      PARSE_DASHBOARD_USER_PASSWORD: ${PARSE_DASHBOARD_USER_PASSWORD}
+    depends_on:
+      - nginx-proxy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Diagnostic tool - Tests Cosmos DB connectivity independently
+  # Using mongo:6.0 to test upgraded Cosmos DB (MongoDB 4.2+)
+  cosmos-db-test:
+    image: mongo:6.0
+    container_name: diagnostic-cosmos-test
+    networks:
+      - parse-server-network
+    environment:
+      COSMOS_DB_URI: ${PARSE_SERVER_DATABASE_URI}
+    command: >
+      sh -c '
+        echo "========================================";
+        echo "Cosmos DB Connection Diagnostic Test";
+        echo "========================================";
+        echo "";
+        echo "Testing connection to Cosmos DB...";
+        echo "Connection URI (masked): $${COSMOS_DB_URI%%:*}://****";
+        echo "";
+        if mongosh "$${COSMOS_DB_URI}" --eval "db.adminCommand({ ping: 1 })" 2>&1 | tee /tmp/mongo-test.log; then
+          echo "";
+          echo "✓ SUCCESS: Connected to Cosmos DB";
+          echo "✓ Database is reachable";
+        else
+          echo "";
+          echo "✗ FAILED: Cannot connect to Cosmos DB";
+          echo "✗ Check connection string and firewall rules";
+          cat /tmp/mongo-test.log;
+        fi;
+        echo "";
+        echo "Listing databases...";
+        mongosh "$${COSMOS_DB_URI}" --eval "db.adminCommand({ listDatabases: 1 })" || echo "Failed to list databases";
+        echo "";
+        echo "Test complete. Container will exit.";
+      '
+    restart: "no"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  # Separate networks to simulate Azure's isolated container groups
+  parse-server-network:
+    driver: bridge
+    name: diagnostic-parse-server-network
+
+  proxy-network:
+    driver: bridge
+    name: diagnostic-proxy-network
