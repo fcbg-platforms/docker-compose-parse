@@ -1,155 +1,175 @@
 # Troubleshooting Guide
 
-## Current Issue Summary
+## Common Issues
 
-### Problem
+### Issue 1: Parse Dashboard 403 Unauthorized Error
 
-Parse Server deployed to Azure Container Instances is experiencing a **CrashLoopBackOff** error when attempting to connect to Azure Cosmos DB for MongoDB API.
-
-### Root Causes Identified
-
-1. **`sed` Special Character Escaping Issue** ✅ FIXED
-   - **Problem**: The Cosmos DB connection string contains `&` characters (e.g., `?ssl=true&replicaSet=globaldb`)
-   - **Impact**: In `sed` replacement, `&` means "insert the matched pattern", so `&` was being replaced with `__DATABASE_URI__`
-   - **Result**: Malformed connection string: `ssl=true__DATABASE_URI__replicaSet=globaldb__DATABASE_URI__...`
-   - **Fix**: Added escaping in [deploy-parse-server.sh](deploy-parse-server.sh#L82-L83):
-
-     ```bash
-     DATABASE_URI_ESCAPED=$(echo "${PARSE_SERVER_DATABASE_URI}" | sed 's/[&/\]/\\&/g')
-     ```
-
-2. **Malformed Cosmos DB Connection String** ✅ FIXED
-   - **Problem**: The [deploy-cosmosdb.sh](deploy-cosmosdb.sh) script was appending `&appName=ParseServer` to a connection string that already had `appName=@accountname@`
-   - **Impact**: Duplicate and malformed `appName` parameters
-   - **Fix**: Updated [deploy-cosmosdb.sh](deploy-cosmosdb.sh#L96-L104) to:
-     - Remove existing `appName` parameter
-     - Insert database name `/parse` before the `?`
-     - Add clean `appName=ParseServer`
-
-3. **Missing Database Name in Connection String** ✅ FIXED
-   - **Problem**: Azure Cosmos DB connection string format: `mongodb://...@host:port/?params`
-   - **Required**: `mongodb://...@host:port/DATABASE_NAME?params`
-   - **Fix**: Connection string now includes `/parse` before query parameters
-
-4. **Parse Server Still Crashing** ⚠️ IN PROGRESS
-   - **Status**: Connection string is now correctly formatted
-   - **Current Issue**: Parse Server exits immediately with no logs
-   - **Next Steps**: Added verbose logging to diagnose Cosmos DB connection failure
-
-### Correct Connection String Format
+**Symptom:**
 
 ```text
-mongodb://parse-cosmos-12345:KEY@parse-cosmos-12345.mongo.cosmos.azure.com:10255/parse?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=ParseServer
+error: Request using master key rejected as the request IP address 'X.X.X.X'
+is not set in Parse Server option 'masterKeyIps'.
 ```
 
-Key components:
+**Cause:** Parse Server's `PARSE_SERVER_MASTER_KEY_IPS` setting restricts which IP addresses can use the master key. By default, it only allows `localhost`.
 
-- `/parse` - Database name (inserted before `?`)
-- `?ssl=true` - SSL required for Cosmos DB
-- `&replicaSet=globaldb` - Cosmos DB replica set
-- `&retrywrites=false` - Cosmos DB doesn't support retry writes
-- `&maxIdleTimeMS=120000` - Connection timeout
-- `&appName=ParseServer` - Application identifier
-
-### Test Script
-
-Run the comprehensive test script to diagnose issues:
+**Solution:** Set `PARSE_SERVER_MASTER_KEY_IPS` in your [.env](.env) file:
 
 ```bash
-bash test-deployment.sh
+# For development/testing (allows all IPs)
+PARSE_SERVER_MASTER_KEY_IPS=0.0.0.0/0,::/0
+
+# For production (restrict to specific IPs)
+PARSE_SERVER_MASTER_KEY_IPS=1.2.3.4,5.6.7.8
 ```
 
-This script tests:
-
-1. DNS resolution
-2. Container status
-3. HTTP connectivity
-4. CORS headers
-5. Parse Server configuration
-6. Database connectivity
-7. Connection stability
-
-### Common Commands
+Then restart the services:
 
 ```bash
-# Check Parse Server status
-az container show --name parse-server --resource-group TikTik_Multi_2_RG --query "containers[0].instanceView.currentState"
+# For VM deployment
+ssh azureuser@${VM_FQDN} 'cd ~/parse-server && docker compose -f docker-compose.production.yml restart parse-server'
 
-# Check Parse Server logs
-az container logs --name parse-server --resource-group TikTik_Multi_2_RG
-
-# Check environment variables
-az container show --name parse-server --resource-group TikTik_Multi_2_RG --query "containers[0].environmentVariables" -o json
-
-# Delete and redeploy Parse Server
-az container delete --name parse-server --resource-group TikTik_Multi_2_RG --yes
-bash deploy-parse-server.sh
-
-# Check Cosmos DB status
-az cosmosdb show --name parse-cosmos-12345 --resource-group TikTik_Multi_2_RG
+# For local development
+docker compose restart parse-server
 ```
 
-### Next Debugging Steps
+---
 
-1. **Enable Verbose Logging** ✅ DONE
-   - Added `VERBOSE=1` and `PARSE_SERVER_LOG_LEVEL=verbose` to deployment
-   - Redeploy to see detailed connection errors
+### Issue 2: MongoDB Password URL Encoding
 
-2. **Verify Cosmos DB API Version**
-   - Cosmos DB for MongoDB API supports versions 3.2, 3.6, 4.0, 4.2
-   - Parse Server 8.3.0 requires MongoDB 4.0+
-   - Check if API version mismatch exists
+**Symptom:** MongoDB connection errors with special characters in password.
 
-3. **Test Connection from Local Machine**
-   - Use `mongosh` or Node.js script to test Cosmos DB connection
-   - Verify credentials and connection string work outside Parse Server
+**Cause:** Special characters in passwords (like `/`, `@`, `:`) must be URL-encoded in connection strings.
 
-4. **Check Parse Server Cosmos DB Compatibility**
-   - Parse Server may have specific MongoDB driver requirements
-   - Cosmos DB for MongoDB API may not support all features Parse Server needs
-   - Consider adding `directConnection=true` parameter
+**Solution:** The [deploy-to-vm.sh](deploy-to-vm.sh) script automatically handles URL encoding. If manually setting `PARSE_SERVER_DATABASE_URI`, use proper encoding:
 
-### Potential Solutions
+- `/` becomes `%2F`
+- `@` becomes `%40`
+- `:` becomes `%3A`
 
-1. **Add Connection Options**
-   Try adding these parameters to the connection string:
+---
 
-   ```bash
-   &directConnection=true&serverSelectionTimeoutMS=30000
-   ```
+### Issue 3: Container Health Checks Failing
 
-2. **Upgrade Cosmos DB API Version**
-   Ensure Cosmos DB is using MongoDB API 4.0 or higher:
+**Symptom:** Containers show as unhealthy in `docker compose ps`.
 
-   ```bash
-   az cosmosdb mongodb database show \
-     --account-name parse-cosmos-12345 \
-     --resource-group TikTik_Multi_2_RG \
-     --name parse
-   ```
+**Cause:** Health check commands require tools available in the container.
 
-3. **Test with Minimal Configuration**
-   Deploy Parse Server with just required environment variables to isolate the issue
+**Solution:** The [docker-compose.production.yml](docker-compose.production.yml) uses Node.js built-in modules for health checks instead of external tools like `wget`.
 
-### Files Modified
+---
 
-- [deploy-parse-server.sh](deploy-parse-server.sh) - Fixed `sed` escaping
-- [deploy-cosmosdb.sh](deploy-cosmosdb.sh) - Fixed connection string format
-- [parse-server-deploy.yaml](parse-server-deploy.yaml) - Added verbose logging
-- [.env](.env) - Corrected `PARSE_SERVER_DATABASE_URI`
-- [test-deployment.sh](test-deployment.sh) - Created comprehensive test script
+### Issue 4: CosmosDB Compatibility (Historical)
 
-### Timeline
+**Note:** This project previously used Azure Cosmos DB but migrated to MongoDB container due to compatibility issues.
 
-1. Initial CORS error reported
-2. Discovered Parse Server was crashing (CrashLoopBackOff)
-3. Fixed `sed` escaping issue with `&` characters
-4. Fixed Cosmos DB connection string format (database name, appName)
-5. Added verbose logging to diagnose remaining connection issue
-6. **Current Status**: Parse Server still crashing - investigating Cosmos DB compatibility
+**Issues encountered:**
 
-### References
+- Cosmos DB MongoDB API 3.6 incompatible with Parse Server 8.x (requires wire version 8+)
+- Missing collation support for case-insensitive indexes
+- Azure ACI firewall blocking due to dynamic outbound IPs
 
-- [Parse Server Documentation](https://docs.parseplatform.org/parse-server/guide/)
-- [Azure Cosmos DB MongoDB API](https://docs.microsoft.com/en-us/azure/cosmos-db/mongodb/introduction)
-- [Parse Server Environment Variables](https://github.com/parse-community/parse-server#configuration)
+**Conclusion:** Use MongoDB container on VM for full compatibility and persistent storage. See [archive/debug-docs/](archive/debug-docs/) for detailed historical context.
+
+---
+
+## Diagnostic Commands
+
+### Check VM and Container Status
+
+```bash
+# SSH to VM
+ssh azureuser@${VM_FQDN}
+
+# Check container status
+cd ~/parse-server && docker compose -f docker-compose.production.yml ps
+
+# View logs
+docker compose -f docker-compose.production.yml logs -f
+
+# Check specific service logs
+docker compose -f docker-compose.production.yml logs parse-server
+docker compose -f docker-compose.production.yml logs mongodb
+docker compose -f docker-compose.production.yml logs parse-dashboard
+```
+
+### Test Parse Server Health
+
+```bash
+# Test health endpoint
+curl http://${VM_FQDN}:1337/parse/health
+
+# Expected response
+{"status":"ok"}
+```
+
+### Check MongoDB Connection
+
+```bash
+# Enter MongoDB container
+ssh azureuser@${VM_FQDN} 'cd ~/parse-server && docker compose -f docker-compose.production.yml exec mongodb mongosh -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin'
+
+# List databases
+show dbs
+
+# Use Parse database
+use parse
+
+# List collections
+show collections
+```
+
+### Azure Resource Management
+
+```bash
+# View VM status
+az vm show --name ${VM_NAME} --resource-group ${RESOURCE_GROUP_NAME} --output table
+
+# View VM public IP
+az network public-ip show --name ${VM_NAME}-ip --resource-group ${RESOURCE_GROUP_NAME}
+
+# Start/stop VM
+az vm start --name ${VM_NAME} --resource-group ${RESOURCE_GROUP_NAME}
+az vm stop --name ${VM_NAME} --resource-group ${RESOURCE_GROUP_NAME}
+```
+
+---
+
+## Quick Fixes
+
+### Restart Services
+
+```bash
+# Restart all services
+ssh azureuser@${VM_FQDN} 'cd ~/parse-server && docker compose -f docker-compose.production.yml restart'
+
+# Restart specific service
+ssh azureuser@${VM_FQDN} 'cd ~/parse-server && docker compose -f docker-compose.production.yml restart parse-server'
+```
+
+### Redeploy Stack
+
+```bash
+# Full redeployment (from local machine)
+./deploy-to-vm.sh
+```
+
+### View Disk Usage
+
+```bash
+# Check data disk usage
+ssh azureuser@${VM_FQDN} 'df -h /mnt/parse-data'
+
+# Check MongoDB data size
+ssh azureuser@${VM_FQDN} 'du -sh /mnt/parse-data/mongodb'
+```
+
+---
+
+## Getting Help
+
+For detailed technical information, see:
+
+- [CLAUDE.md](CLAUDE.md) - Comprehensive technical documentation
+- [README.md](README.md) - Quick start guide
+- [archive/debug-docs/](archive/debug-docs/) - Historical troubleshooting context

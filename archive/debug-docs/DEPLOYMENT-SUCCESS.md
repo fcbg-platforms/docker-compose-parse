@@ -123,7 +123,7 @@ HTTP/1.1 302 Found
 
 ### Container Status ✅
 
-```
+```text
 NAME              STATUS
 mongodb           Up 2 minutes (healthy)
 parse-server      Up 2 minutes (healthy)

@@ -7,7 +7,7 @@ Your Parse Server crashes are caused by a **MongoDB wire protocol version mismat
 - **Your Cosmos DB**: MongoDB 3.6 API (wire version 6)
 - **Parse Server 8.3.0 requires**: MongoDB 4.2+ (wire version 8+)
 
-```
+```text
 Error: Server reports maximum wire version 6, but this version of the Node.js Driver requires at least 8 (MongoDB 4.2)
 ```
 

@@ -360,36 +360,29 @@ The Cosmos DB approach was abandoned due to:
 
 ## Troubleshooting
 
-### VM Deployment Issues
+For common issues and solutions, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
-**SSH Connection Fails:**
+Key troubleshooting topics:
 
-- Verify NSG allows SSH from your IP
-- Check VM is running: `az vm show --name ${VM_NAME} --resource-group ${RESOURCE_GROUP_NAME}`
-- Verify SSH key permissions: `chmod 600 ~/.ssh/id_rsa`
+- Parse Dashboard 403 Unauthorized errors
+- MongoDB password URL encoding issues
+- Container health check failures
+- Historical CosmosDB compatibility issues
 
-**Docker Containers Not Starting:**
+### Quick Diagnostic Commands
 
-- SSH to VM and check logs: `cd ~/parse-server && docker compose logs`
-- Verify disk is mounted: `df -h /mnt/parse-data`
-- Check Docker service: `sudo systemctl status docker`
+```bash
+# Test deployment health
+./test-vm-deployment.sh
 
-**Parse Server Health Check Fails:**
+# Check container status
+ssh azureuser@${VM_FQDN} 'cd ~/parse-server && docker compose -f docker-compose.production.yml ps'
 
-- Check MongoDB is running: `docker compose ps mongodb`
-- Verify DATABASE_URI is correct in `.env`
-- Check container logs: `docker compose logs parse-server`
+# View logs
+ssh azureuser@${VM_FQDN} 'cd ~/parse-server && docker compose -f docker-compose.production.yml logs -f'
 
-**Cannot Access Services from Internet:**
+# Test Parse Server health
+curl http://${VM_FQDN}:1337/parse/health
+```
 
-- Verify NSG rules: `az network nsg rule list --nsg-name ${VM_NAME}-nsg`
-- Check containers are listening: `docker compose ps`
-- Verify public IP: `az network public-ip show --name ${VM_NAME}-ip`
-
-### Getting Help
-
-For issues or questions:
-
-1. Check container logs: `docker compose logs [service-name]`
-2. Verify environment variables: `cat ~/parse-server/.env`
-3. Review Azure resources: `az resource list --resource-group ${RESOURCE_GROUP_NAME}`
+For detailed troubleshooting steps, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

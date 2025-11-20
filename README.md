@@ -76,6 +76,7 @@ All configuration is managed through environment variables in `.env`. Copy `.env
 | `setup-vm.sh` | Install Docker, mount data disk, configure auto-start |
 | `deploy-to-vm.sh` | Deploy/update Parse Server stack on VM |
 | `cleanup-aci.sh` | Remove old Azure Container Instances (if migrating) |
+| `test-vm-deployment.sh` | Run comprehensive deployment tests |
 
 ## Architecture
 
@@ -171,32 +172,22 @@ docker compose down && docker compose up -d
 
 ## Troubleshooting
 
-### Cannot access Parse Server from internet
+For common issues and detailed solutions, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
-Check NSG rules and container status:
-
-```bash
-az network nsg rule list --nsg-name parse-server-vm-nsg --resource-group TikTik_Multi_2_RG --output table
-ssh azureuser@${VM_FQDN} 'docker compose -f ~/parse-server/docker-compose.production.yml ps'
-```
-
-### Containers not starting
-
-Check logs on the VM:
+Quick diagnostic test:
 
 ```bash
-ssh azureuser@${VM_FQDN} 'cd ~/parse-server && docker compose -f docker-compose.production.yml logs'
+# Run comprehensive test suite
+./test-vm-deployment.sh
 ```
 
-### Data disk not mounted
+Common issues:
 
-SSH to VM and check:
+- **Parse Dashboard 403 errors**: Set `PARSE_SERVER_MASTER_KEY_IPS=0.0.0.0/0,::/0` in `.env`
+- **Containers not starting**: Check logs with `docker compose logs`
+- **Cannot access from internet**: Verify NSG rules and container status
 
-```bash
-ssh azureuser@${VM_FQDN}
-df -h /mnt/parse-data
-sudo mount -a
-```
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions.
 
 ## Migration from ACI
 
@@ -215,9 +206,11 @@ Old ACI deployment scripts are archived in `archive/aci-deployment/`.
 ## Documentation
 
 - [CLAUDE.md](CLAUDE.md) - Comprehensive technical documentation
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues and solutions
 - [.env.example](.env.example) - Configuration template
 - [docker-compose.yml](docker-compose.yml) - Local development
 - [docker-compose.production.yml](docker-compose.production.yml) - Production configuration
+- [archive/](archive/) - Historical deployment files and debug documentation
 
 ## Version History
 
