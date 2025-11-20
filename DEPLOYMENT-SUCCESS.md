@@ -15,7 +15,7 @@
 - **Region**: Switzerland North
 - **VM Name**: parse-server-vm
 - **VM Size**: Standard_B2s (2 vCPU, 4GB RAM)
-- **Public IP**: 20.250.24.192
+- **Public IP**: [Your VM Public IP]
 - **DNS**: parse-vm-prod.switzerlandnorth.cloudapp.azure.com
 
 ### Storage
@@ -143,14 +143,14 @@ ssh azureuser@parse-vm-prod.switzerlandnorth.cloudapp.azure.com
 ### Parse Server API
 
 - **URL**: <http://parse-vm-prod.switzerlandnorth.cloudapp.azure.com:1337/parse>
-- **IP**: <http://20.250.24.192:1337/parse>
+- **IP**: http://[Your-VM-IP]:1337/parse
 
 ### Parse Dashboard
 
 - **URL**: <http://parse-vm-prod.switzerlandnorth.cloudapp.azure.com:4040>
-- **IP**: <http://20.250.24.192:4040>
-- **Username**: your_dashboard_username
-- **Password**: dQrwiH4bCGU9lfEs1mCb+D3GN/xHIo5S
+- **IP**: http://[Your-VM-IP]:4040
+- **Username**: [From your .env file: PARSE_DASHBOARD_USER_NAME]
+- **Password**: [From your .env file: PARSE_DASHBOARD_USER_PASSWORD]
 
 ---
 
