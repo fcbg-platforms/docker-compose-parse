@@ -5,7 +5,7 @@ properties:
   containers:
     - name: parse-server
       properties:
-        image: parseplatform/parse-server:5.5.0
+        image: parseplatform/parse-server:8.3.0
         ports:
           - port: 1337
             protocol: TCP
@@ -26,6 +26,8 @@ properties:
             value: "X-Parse-Master-Key, X-Parse-REST-API-Key, X-Parse-Javascript-Key, X-Parse-Application-Id, X-Parse-Client-Version, X-Parse-Session-Token, X-Requested-With, X-Parse-Revocable-Session, X-Parse-Request-Id, Content-Type, Pragma, Cache-Control"
           - name: PARSE_SERVER_ALLOW_CLIENT_CLASS_CREATION
             value: "true"
+          - name: PARSE_SERVER_MASTER_KEY_IPS
+            value: "0.0.0.0/0,::/0"
           - name: VERBOSE
             value: "1"
           - name: PARSE_SERVER_LOG_LEVEL
