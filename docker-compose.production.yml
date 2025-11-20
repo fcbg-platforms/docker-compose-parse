@@ -3,27 +3,33 @@ services:
     image: mongo:latest
     container_name: mongodb
     restart: always
-    ports:
-      - 27017:27017
+    # Note: MongoDB port is NOT exposed publicly for security
+    # It's only accessible within the Docker network
     volumes:
-      - ./data/mongodb:/data/db
-      - ./data/mongo-config:/data/configdb # Persist MongoDB configuration
+      - /mnt/parse-data/mongodb:/data/db
+      - /mnt/parse-data/mongo-config:/data/configdb
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
     networks:
       - parse-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   parse-server:
     container_name: parse-server
     image: parseplatform/parse-server:8.4.0
     restart: always
     ports:
-      - 1337:1337
+      - "1337:1337"
     volumes:
-      - ./data/config-vol:/parse-server/config
+      - /mnt/parse-data/config-vol:/parse-server/config
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     environment:
       - PORT=1337
       - PARSE_SERVER_APPLICATION_ID=${PARSE_SERVER_APPLICATION_ID}
@@ -36,13 +42,21 @@ services:
       - PARSE_SERVER_ALLOW_CLIENT_CLASS_CREATION=true
     networks:
       - parse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:1337/parse/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   parse-dashboard:
     container_name: parse-dashboard
     image: parseplatform/parse-dashboard:8.0.0
     restart: always
     ports:
-      - 4040:4040
+      - "4040:4040"
+    depends_on:
+      parse-server:
+        condition: service_healthy
     environment:
       - PARSE_DASHBOARD_SERVER_URL=${PARSE_SERVER_URL}
       - PARSE_DASHBOARD_APP_ID=${PARSE_SERVER_APPLICATION_ID}
@@ -53,22 +67,11 @@ services:
       - PARSE_DASHBOARD_USER_PASSWORD=${PARSE_DASHBOARD_USER_PASSWORD}
     networks:
       - parse-network
-
-  # Optional: Mongo Restore
-  # mongo-restore:
-  #   container_name: mongo-restore
-  #   image: mongo:7.0.3
-  #   restart: on-failure
-  #   depends_on:
-  #     - mongodb
-  #   volumes:
-  #     - ./mongo-backup:/mongo-backup:ro
-  #   entrypoint: >
-  #     bash -c "sleep 20 &&
-  #     mongorestore --host mongodb --port 27017 --username ${MONGO_INITDB_ROOT_USERNAME} --password ${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin --db test --drop /mongo-backup/test
-  #     "
-  #   networks:
-  #     - parse-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4040', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   parse-network:

@@ -5,7 +5,7 @@ properties:
   containers:
     - name: mongodb
       properties:
-        image: mongo:8.2.1
+        image: mongo:7.0.15
         ports:
           - port: 27017
             protocol: TCP
@@ -13,7 +13,7 @@ properties:
           - name: MONGO_INITDB_ROOT_USERNAME
             value: "__MONGO_USERNAME__"
           - name: MONGO_INITDB_ROOT_PASSWORD
-            secureValue: "__MONGO_PASSWORD__"
+            value: "__MONGO_PASSWORD__"
         resources:
           requests:
             cpu: 1.0

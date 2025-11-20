@@ -15,7 +15,7 @@ properties:
           - name: PARSE_DASHBOARD_APP_ID
             value: "__APP_ID__"
           - name: PARSE_DASHBOARD_MASTER_KEY
-            secureValue: "__MASTER_KEY__"
+            value: "__MASTER_KEY__"
           - name: PARSE_DASHBOARD_APP_NAME
             value: "__APP_NAME__"
           - name: PARSE_DASHBOARD_ALLOW_INSECURE_HTTP
@@ -23,7 +23,7 @@ properties:
           - name: PARSE_DASHBOARD_USER_ID
             value: "__USER_ID__"
           - name: PARSE_DASHBOARD_USER_PASSWORD
-            secureValue: "__USER_PASSWORD__"
+            value: "__USER_PASSWORD__"
         resources:
           requests:
             cpu: 0.5

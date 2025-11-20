@@ -25,3 +25,7 @@ dist/
 build/
 
 data/
+
+# Generated files (should be deleted automatically)
+*-deploy-generated.yaml
+.env.backup

@@ -1,0 +1,30 @@
+apiVersion: 2019-12-01
+location: __LOCATION__
+name: mongodb-temp
+properties:
+  containers:
+    - name: mongodb
+      properties:
+        image: mongo:6.0
+        ports:
+          - port: 27017
+            protocol: TCP
+        environmentVariables:
+          - name: MONGO_INITDB_ROOT_USERNAME
+            value: "__MONGO_USERNAME__"
+          - name: MONGO_INITDB_ROOT_PASSWORD
+            value: "__MONGO_PASSWORD__"
+        resources:
+          requests:
+            cpu: 1.0
+            memoryInGB: 2.0
+  osType: Linux
+  restartPolicy: Always
+  ipAddress:
+    type: Public
+    ports:
+      - port: 27017
+        protocol: TCP
+    dnsNameLabel: mongodb-__RANDOM__
+tags: {}
+type: Microsoft.ContainerInstance/containerGroups
